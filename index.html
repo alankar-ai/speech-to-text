@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STT</title>
+    <style>
+        body {
+            padding: 0px;
+            margin: 0px;
+        }
+
+        .button {
+            width: 80px;
+            background: #ffffff36;
+            display: flex;
+            justify-content: center;
+            border: 2px solid #b0b0b0;
+            box-shadow: 0px 0px 5px #c4c4c4;
+            border-radius: 10px;
+            cursor: pointer;
+            background: white;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .button_icon {
+            width: 20px
+        }
+
+        .timer {
+            font-size: 18px;
+            line-height: 26px;
+            font-weight: 700;
+            cursor: text;
+        }
+
+        .controler_block {
+            display: flex;
+            width: 300px;
+            margin: 52px auto;
+            justify-content: space-between;
+            margin-top: 0px;
+            padding-top: 52px;
+        }
+
+        .main_block {
+            height: 100vh;
+            position: relative;
+            background: rgb(154 154 255);
+        }
+
+        .main_text_block {
+            max-width: 600px;
+            min-height: 25vh;
+            margin: 30px auto;
+            box-shadow: 0 3px 10px rgb(0 0 0 / 0.2);
+            padding: 20px;
+            border-radius: 12px;
+            background: white;
+        }
+
+        .btn_active {
+            opacity: .4;
+            cursor: not-allowed;
+        }
+
+        .layer {
+            position: absolute;
+            height: 100vh;
+            top: 0px;
+            width: 100vw;
+            background: #b8b8b869;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .waiting_text {
+            font-size: 32px;
+            font-weight: 700;
+            font-family: monospace;
+            text-align: center;
+            margin-bottom: 20vh;
+        }
+
+        .none {
+            display: none;
+        }
+
+        #voice_text {
+            font-weight: 500;
+            outline: none;
+            font-family: system-ui;
+            letter-spacing: .5px;
+        }
+
+        .main_haiding {
+            text-align: center;
+            padding-top: 60px;
+            font-size: 32px;
+            font-weight: 800;
+            font-family: monospace;
+            color: black;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="main_block">
+        <div>
+            <div class="main_haiding">Speech to Text</div>
+            <div class="controler_block">
+                <div>
+                    <div class="button" id="play_pause_btn">
+                        <img class="button_icon" id="play_icon" src="./assests/play-solid.svg">
+                        <img class="button_icon none" id="pause_icon" src="./assests/pause-solid.svg">
+                    </div>
+                </div>
+                <div class="button" id="mic_btn">
+                    <img class="button_icon none" id="mic_icon" src="./assests/microphone-solid (1).svg">
+                    <img class="button_icon btn_active" id="muted_mic_icon" style="width: 28px;"
+                        src="./assests/microphone-slash-solid.svg">
+                </div>
+                <div>
+                    <div class="button timer">
+                        <div id="timer">
+                            00:00
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <div class="main_text_block">
+                    <div id="voice_text" contentEditable="true">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="layer none" id="layer">
+            <div>
+                <div class="waiting_text">
+                    Processing....
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+
+        // Script for the timer
+        let minutes = 0;
+        let seconds = 0;
+        let timerInterval;
+
+        function startTimer() {
+            timerInterval = setInterval(updateTimer, 1000);
+        }
+
+        function updateTimer() {
+            seconds++;
+            if (seconds === 60) {
+                minutes++;
+                seconds = 0;
+            }
+            displayTimer();
+        }
+
+        function displayTimer() {
+            const timerDisplay = document.getElementById('timer');
+            timerDisplay.textContent = padNumber(minutes) + ':' + padNumber(seconds);
+        }
+
+        function padNumber(num) {
+            return num.toString().padStart(2, '0');
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            minutes = 0;
+            seconds = 0;
+            displayTimer();
+        }
+
+
+
+
+
+        // script for the voice to text model
+        const playPauseBtn = document.getElementById('play_pause_btn')
+
+
+        const playIcon = document.getElementById('play_icon');
+        const pauseIcon = document.getElementById('pause_icon');
+        const micIcon = document.getElementById('mic_icon');
+        const mutedMicIcon = document.getElementById('muted_mic_icon');
+
+        let isRecording = false;
+        let audioChunks = [];
+        let mediaRecorder;
+
+
+        playPauseBtn.addEventListener('click', () => {
+            toggleRecording()
+        })
+
+        function toggleRecording() {
+            isRecording = !isRecording;
+
+            if (isRecording) {
+
+                const voiceText = document.getElementById('voice_text');
+                voiceText.textContent = '';
+
+                startRecording();
+            } else {
+                resetTimer()
+                stopRecording();
+            }
+        }
+
+        function startRecording() {
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+
+                    toggleUIUpdate(true)
+                    startTimer();
+
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    mediaRecorder.addEventListener("dataavailable", event => {
+                        audioChunks.push(event.data);
+                    });
+
+                    mediaRecorder.addEventListener("stop", () => {
+                        const audioBlob = new Blob(audioChunks);
+                        const audioFile = new File([audioBlob], "recorded_audio.wav");
+
+                        // Create a FormData object to send the audio file to the backend
+                        const formData = new FormData();
+                        formData.append("audio_file", audioFile);
+
+                        sendAudio(formData);
+                    });
+
+                    mediaRecorder.start();
+                })
+                .catch(error => {
+                    console.error("Error accessing microphone:", error);
+                });
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== "inactive") {
+                toggleUIUpdate(false)
+                mediaRecorder.stop();
+            }
+        }
+
+        const toggleUIUpdate = (isPlay) => {
+            if (isPlay) {
+                playIcon.classList.add('none');
+                pauseIcon.classList.remove('none');
+                micIcon.classList.remove('none');
+                mutedMicIcon.classList.add('none')
+            } else {
+                playIcon.classList.remove('none');
+                pauseIcon.classList.add('none');
+                micIcon.classList.add('none');
+                mutedMicIcon.classList.remove('none')
+            }
+        }
+
+
+
+        function sendAudio(formData) {
+            // Show loading symbol
+            showWaiting(true)
+            fetch("https://speech-to-text-qk8p.onrender.com/audio", {
+                method: "POST",
+                body: formData,
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log("data", data)
+                    const transcript = data.transcript;
+                    displayTranscript(transcript);
+
+
+
+                    showWaiting(false)
+                })
+                .catch(error => {
+                    console.error("Error sending audio:", error);
+
+
+                    showWaiting(false)
+                });
+        }
+
+        const showWaiting = (isWaiting) => {
+            if (isWaiting) {
+                document.getElementById('layer').classList.remove('none')
+            }
+            else {
+                document.getElementById('layer').classList.add('none')
+            }
+        }
+
+
+        function displayTranscript(transcript) {
+            const voiceText = document.getElementById('voice_text');
+            console.log('voiceText', transcript)
+            voiceText.textContent = transcript;
+        }
+
+    </script>
+</body>
+
+</html>
