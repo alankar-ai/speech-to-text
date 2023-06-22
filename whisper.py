@@ -53,18 +53,16 @@ async def audio(audio_file: UploadFile = File(...)):
 
         # Transcribe the audio using OpenAI Whisper ASR model
         audio_file = open("temp_audio.mp3", "rb")
-        response = openai.Audio.transcribe("whisper-1", audio_file, response_format="text",language="en")
-        transcript = response['text']
-        
+        response = openai.Audio.transcribe("whisper-1", audio_file, response_format="text",language="en")        
         # Delete the temporary audio file
         os.remove("temp_audio.mp3")
 
         # Return the transcript in the response
-        return {"transcript": transcript}
+        return {"transcript": response}
 
     except Exception as e:
-        logging.exception("An error occurred during audio processing:")
-        return {"error": "Failed to process audio"}
+        logging.exception("Failed to process audio file")
+        return {"error": str(e)}
 
 
 
